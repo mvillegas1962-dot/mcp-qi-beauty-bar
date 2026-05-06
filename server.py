@@ -59,5 +59,8 @@ async def cancelar_cita(id_cita: int) -> str:
     return json.dumps({"exito": False, "detalle": r.text}, ensure_ascii=False)
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    app = mcp.streamable_http_app()
+    uvicorn.run(app, host="0.0.0.0", port=port)
     
