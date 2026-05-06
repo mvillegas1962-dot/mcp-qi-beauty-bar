@@ -1,6 +1,11 @@
 import json
+import os
 import httpx
 from mcp.server.fastmcp import FastMCP
+from mcp.server.sse import SseServerTransport
+from starlette.applications import Starlette
+from starlette.routing import Route
+import uvicorn
 
 AGENDAPRO_API_KEY = "apk_live_9e6a576c0be489891777985b4e029444"
 AGENDAPRO_BASE    = "https://connect.agendapro.com/v3"
@@ -16,25 +21,25 @@ mcp = FastMCP("qi-beauty-bar")
 
 @mcp.tool()
 async def consultar_servicios() -> str:
-    """Devuelve la lista de servicios de Qi Beauty Bar con ID, nombre, precio y duración.
+    """Devuelve servicios de Qi Beauty Bar con ID, nombre, precio y duración.
     Úsalo cuando el cliente pregunte qué servicios hay, precios o duración."""
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{AGENDAPRO_BASE}/services", headers=HEADERS, params={"location_id": LOCATION_ID})
     data = r.json().get("data", [])
-    servicios = [{"id": s["id"], "nombre": s["name"], "precio": f"${float(s['price']):.0f} MXN", "duracion": f"{s['duration']} min", "categoria": s.get("category", {}).get("name", "")} for s in data if s.get("active") and s.get("online_booking")]
+    servicios = [{"id": s["id"], "nombre": s["name"], "precio": f"${float(s['price']):.0f} MXN", "duracion": f"{s['duration']} min"} for s in data if s.get("active") and s.get("online_booking")]
     return json.dumps(servicios, ensure_ascii=False)
 
 @mcp.tool()
 async def consultar_disponibilidad(fecha: str, servicio_id: int) -> str:
-    """Consulta horarios disponibles para una fecha y servicio específico.
-    Parámetros: fecha (YYYY-MM-DD), servicio_id (número entero).
+    """Consulta horarios disponibles para una fecha y servicio.
+    Parámetros: fecha (YYYY-MM-DD), servicio_id (entero).
     Úsalo cuando el cliente quiera saber qué horas hay disponibles."""
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{AGENDAPRO_BASE}/available_slots", headers=HEADERS, params={"location_id": LOCATION_ID, "service_id": servicio_id, "date": fecha})
     slots = r.json().get("data", [])
     if not slots:
         return f"No hay horarios disponibles para el {fecha}."
-    return json.dumps({"fecha": fecha, "horarios_disponibles": [s.get("time", s) for s in slots]}, ensure_ascii=False)
+    return json.dumps({"fecha": fecha, "horarios_disponibles": [s.get("time", str(s)) for s in slots]}, ensure_ascii=False)
 
 @mcp.tool()
 async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str) -> str:
@@ -57,5 +62,10 @@ async def cancelar_cita(id_cita: int) -> str:
         return json.dumps({"exito": True, "mensaje": "Cita cancelada correctamente."}, ensure_ascii=False)
     return json.dumps({"exito": False, "detalle": r.text}, ensure_ascii=False)
 
+sse_transport = SseServerTransport("/messages/")
+starlette_app = mcp.sse_app()
+
 if __name__ == "__main__":
-    mcp.run(transport="sse")
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run(starlette_app, host="0.0.0.0", port=port) 
+    
