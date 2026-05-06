@@ -2,10 +2,6 @@ import json
 import os
 import httpx
 from mcp.server.fastmcp import FastMCP
-from mcp.server.sse import SseServerTransport
-from starlette.applications import Starlette
-from starlette.routing import Route
-import uvicorn
 
 AGENDAPRO_API_KEY = "apk_live_9e6a576c0be489891777985b4e029444"
 AGENDAPRO_BASE    = "https://connect.agendapro.com/v3"
@@ -62,10 +58,7 @@ async def cancelar_cita(id_cita: int) -> str:
         return json.dumps({"exito": True, "mensaje": "Cita cancelada correctamente."}, ensure_ascii=False)
     return json.dumps({"exito": False, "detalle": r.text}, ensure_ascii=False)
 
-sse_transport = SseServerTransport("/messages/")
-starlette_app = mcp.sse_app()
-
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run(starlette_app, host="0.0.0.0", port=port) 
+    mcp.run(transport="streamable-http", host="0.0.0.0", port=port, path="/mcp")
     
