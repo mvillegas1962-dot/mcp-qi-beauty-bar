@@ -6,8 +6,6 @@ from starlette.applications import Starlette
 from starlette.requests import Request
 from starlette.responses import JSONResponse, Response
 from starlette.routing import Route
-from starlette.middleware import Middleware
-from starlette.middleware.base import BaseHTTPMiddleware
 
 AGENDAPRO_API_KEY = "apk_live_9e6a576c0be489891777985b4e029444"
 AGENDAPRO_BASE    = "https://connect.agendapro.com/v3"
@@ -19,8 +17,6 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-# ── Tools ──────────────────────────────────────────────────
-
 async def consultar_servicios():
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{AGENDAPRO_BASE}/services", headers=HEADERS, params={"location_id": LOCATION_ID})
@@ -29,11 +25,11 @@ async def consultar_servicios():
 
 async def consultar_disponibilidad(fecha: str, servicio_id: int):
     async with httpx.AsyncClient() as client:
-        r = await client.get(f"{AGENDAPRO_BASE}/available_slots", headers=HEADERS, params={"location_id": LOCATION_ID, "service_id": servicio_id, "date": fecha})
-    slots = r.json().get("data", [])
+        r = await client.get(f"{AGENDAPRO_BASE}/available_slots", headers=HEADERS, params={"location_id": LOCATION_ID, "service_id": servicio_id, "start_date": fecha})
+    slots = r.json().get("data", {}).get("slots", [])
     if not slots:
         return {"mensaje": f"No hay horarios disponibles para el {fecha}."}
-    return {"fecha": fecha, "horarios_disponibles": [s.get("time", str(s)) for s in slots]}
+    return {"fecha": fecha, "horarios_disponibles": [s.get("start_time") for s in slots]}
 
 async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str):
     payload = {"location_id": LOCATION_ID, "provider_id": PROVIDER_ID, "service_id": servicio_id, "date": fecha, "time": hora, "client": {"name": nombre, "phone": telefono, "email": email}}
@@ -50,12 +46,10 @@ async def cancelar_cita(id_cita: int):
         return {"exito": True, "mensaje": "Cita cancelada correctamente."}
     return {"exito": False, "detalle": r.text}
 
-# ── MCP Handler ────────────────────────────────────────────
-
 TOOLS = [
     {"name": "consultar_servicios", "description": "Devuelve servicios de Qi Beauty Bar con ID, nombre, precio y duración. Úsalo cuando el cliente pregunte qué servicios hay, precios o duración.", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-    {"name": "consultar_disponibilidad", "description": "Consulta horarios disponibles para una fecha y servicio. Úsalo cuando el cliente quiera saber qué horas hay disponibles.", "inputSchema": {"type": "object", "properties": {"fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "servicio_id": {"type": "integer", "description": "ID del servicio"}}, "required": ["fecha", "servicio_id"]}},
-    {"name": "crear_cita", "description": "Crea una cita en AgendaPro. Úsalo cuando el cliente confirme que quiere agendar y tengas todos sus datos.", "inputSchema": {"type": "object", "properties": {"nombre": {"type": "string"}, "telefono": {"type": "string"}, "email": {"type": "string"}, "servicio_id": {"type": "integer"}, "fecha": {"type": "string"}, "hora": {"type": "string"}}, "required": ["nombre", "telefono", "email", "servicio_id", "fecha", "hora"]}},
+    {"name": "consultar_disponibilidad", "description": "Consulta horarios disponibles para una fecha y servicio. Úsalo cuando el cliente quiera saber qué horas hay disponibles.", "inputSchema": {"type": "object", "properties": {"fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "servicio_id": {"type": "integer", "description": "ID del servicio obtenido de consultar_servicios"}}, "required": ["fecha", "servicio_id"]}},
+    {"name": "crear_cita", "description": "Crea una cita en AgendaPro. Úsalo cuando el cliente confirme que quiere agendar y tengas todos sus datos.", "inputSchema": {"type": "object", "properties": {"nombre": {"type": "string"}, "telefono": {"type": "string"}, "email": {"type": "string"}, "servicio_id": {"type": "integer"}, "fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "hora": {"type": "string", "description": "Hora en formato HH:MM"}}, "required": ["nombre", "telefono", "email", "servicio_id", "fecha", "hora"]}},
     {"name": "cancelar_cita", "description": "Cancela una cita existente dado su ID numérico. Úsalo cuando el cliente quiera cancelar una cita agendada.", "inputSchema": {"type": "object", "properties": {"id_cita": {"type": "integer"}}, "required": ["id_cita"]}},
 ]
 
