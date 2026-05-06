@@ -33,8 +33,10 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
 
 async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str):
     payload = {"location_id": LOCATION_ID, "provider_id": PROVIDER_ID, "service_id": servicio_id, "date": fecha, "time": hora, "client": {"name": nombre, "phone": telefono, "email": email}}
+    print(f"CREAR_CITA payload: {json.dumps(payload)}")
     async with httpx.AsyncClient() as client:
         r = await client.post(f"{AGENDAPRO_BASE}/bookings", headers=HEADERS, json=payload)
+    print(f"CREAR_CITA status: {r.status_code} response: {r.text}")
     if r.status_code in (200, 201):
         return {"exito": True, "mensaje": f"Cita confirmada para {nombre} el {fecha} a las {hora}.", "id_cita": r.json().get("data", {}).get("id")}
     return {"exito": False, "detalle": r.text}
@@ -85,6 +87,7 @@ async def handle_mcp(request: Request):
                 return JSONResponse({"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32601, "message": f"Tool not found: {tool_name}"}})
             return JSONResponse({"jsonrpc": "2.0", "id": msg_id, "result": {"content": [{"type": "text", "text": json.dumps(result, ensure_ascii=False)}]}})
         except Exception as e:
+            print(f"ERROR en tool {tool_name}: {str(e)}")
             return JSONResponse({"jsonrpc": "2.0", "id": msg_id, "error": {"code": -32000, "message": str(e)}})
 
     if method == "notifications/initialized":
@@ -97,4 +100,5 @@ app = Starlette(routes=[Route("/mcp", handle_mcp, methods=["POST"])])
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
     
