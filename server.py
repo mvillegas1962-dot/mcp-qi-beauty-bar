@@ -3,6 +3,10 @@ import os
 import httpx
 import uvicorn
 from mcp.server.fastmcp import FastMCP
+from mcp.server import streamable_http
+
+# Patch para deshabilitar validación de host
+streamable_http.ALLOWED_HOSTS = None
 
 AGENDAPRO_API_KEY = "apk_live_9e6a576c0be489891777985b4e029444"
 AGENDAPRO_BASE    = "https://connect.agendapro.com/v3"
@@ -14,12 +18,7 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-mcp = FastMCP(
-    "qi-beauty-bar",
-    host="0.0.0.0",
-    port=int(os.environ.get("PORT", 8080)),
-    allowed_hosts=["unique-adaptation-production-89cc.up.railway.app", "localhost", "127.0.0.1"],
-)
+mcp = FastMCP("qi-beauty-bar")
 
 @mcp.tool()
 async def consultar_servicios() -> str:
@@ -65,5 +64,7 @@ async def cancelar_cita(id_cita: int) -> str:
     return json.dumps({"exito": False, "detalle": r.text}, ensure_ascii=False)
 
 if __name__ == "__main__":
-    mcp.run(transport="streamable-http")
+    port = int(os.environ.get("PORT", 8080))
+    app = mcp.streamable_http_app()
+    uvicorn.run(app, host="0.0.0.0", port=port, proxy_headers=True, forwarded_allow_ips="*")
     
