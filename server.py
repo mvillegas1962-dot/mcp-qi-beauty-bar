@@ -31,7 +31,7 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
     return {"fecha": fecha, "horarios_disponibles": [s.get("start_time") for s in slots]}
 
 async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str):
-    payload = {"location_id": LOCATION_ID, "service_id": servicio_id, "date": fecha, "time": hora, "client": {"name": nombre, "phone": telefono, "email": email}}
+    payload = {"location_id": LOCATION_ID, "service_id": servicio_id, "date": fecha, "start_time": hora, "client": {"name": nombre, "phone": telefono, "email": email}}
     print(f"CREAR_CITA payload: {json.dumps(payload)}")
     async with httpx.AsyncClient() as client:
         r = await client.post(f"{AGENDAPRO_BASE}/bookings", headers=HEADERS, json=payload)
@@ -99,6 +99,7 @@ app = Starlette(routes=[Route("/mcp", handle_mcp, methods=["POST"])])
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
