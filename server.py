@@ -41,8 +41,7 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
     }
 
 async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str, provider_id: int = None):
-    hora_formateada = hora if len(hora) > 5 else f"{hora}:00"
-    payload = {"location_id": LOCATION_ID, "service_id": servicio_id, "date": fecha, "start_time": hora_formateada, "client": {"name": nombre, "phone": telefono, "email": email}}
+    payload = {"location_id": LOCATION_ID, "service_id": servicio_id, "date": fecha, "start_time": hora, "client": {"name": nombre, "phone": telefono, "email": email}}
     if provider_id:
         payload["provider_id"] = provider_id
     print(f"CREAR_CITA payload: {json.dumps(payload)}")
@@ -63,7 +62,7 @@ async def cancelar_cita(id_cita: int):
 TOOLS = [
     {"name": "consultar_servicios", "description": "Devuelve servicios de Qi Beauty Bar con ID, nombre, precio y duración. Úsalo cuando el cliente pregunte qué servicios hay, precios o duración.", "inputSchema": {"type": "object", "properties": {}, "required": []}},
     {"name": "consultar_disponibilidad", "description": "Consulta horarios disponibles para una fecha y servicio. Devuelve hora, provider_id y nombre del especialista. Úsalo cuando el cliente quiera saber qué horas hay disponibles.", "inputSchema": {"type": "object", "properties": {"fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "servicio_id": {"type": "integer", "description": "ID del servicio obtenido de consultar_servicios"}}, "required": ["fecha", "servicio_id"]}},
-    {"name": "crear_cita", "description": "Crea una cita en AgendaPro. Úsalo cuando el cliente confirme que quiere agendar y tengas todos sus datos. El provider_id debe venir exactamente del resultado de consultar_disponibilidad.", "inputSchema": {"type": "object", "properties": {"nombre": {"type": "string"}, "telefono": {"type": "string"}, "email": {"type": "string"}, "servicio_id": {"type": "integer"}, "fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "hora": {"type": "string", "description": "Hora en formato HH:MM exactamente como la devolvió consultar_disponibilidad"}, "provider_id": {"type": "integer", "description": "ID del especialista exactamente como lo devolvió consultar_disponibilidad"}}, "required": ["nombre", "telefono", "email", "servicio_id", "fecha", "hora", "provider_id"]}},
+    {"name": "crear_cita", "description": "Crea una cita en AgendaPro. Úsalo cuando el cliente confirme que quiere agendar y tengas todos sus datos. La hora y provider_id deben venir exactamente del resultado de consultar_disponibilidad sin modificar.", "inputSchema": {"type": "object", "properties": {"nombre": {"type": "string"}, "telefono": {"type": "string"}, "email": {"type": "string"}, "servicio_id": {"type": "integer"}, "fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "hora": {"type": "string", "description": "Hora exactamente como la devolvió consultar_disponibilidad, sin modificar"}, "provider_id": {"type": "integer", "description": "ID del especialista exactamente como lo devolvió consultar_disponibilidad"}}, "required": ["nombre", "telefono", "email", "servicio_id", "fecha", "hora", "provider_id"]}},
     {"name": "cancelar_cita", "description": "Cancela una cita existente dado su ID numérico. Úsalo cuando el cliente quiera cancelar una cita agendada.", "inputSchema": {"type": "object", "properties": {"id_cita": {"type": "integer"}}, "required": ["id_cita"]}},
 ]
 
