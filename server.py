@@ -91,6 +91,7 @@ async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, f
         "start_time": f"{fecha}T{hora}:00Z",
         "end": f"{fecha}T{hora_fin}:00Z" if hora_fin else None,
         "end_time": f"{fecha}T{hora_fin}:00Z" if hora_fin else None,
+        "status_id": 1,
         "client_id": client_id,  # en la raíz, no anidado
         "provider_id": provider_id
     }
