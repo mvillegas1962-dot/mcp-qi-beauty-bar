@@ -42,17 +42,18 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
     }
 
 async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str, provider_id: int = None, hora_fin: str = None):
+    start_time = f"{fecha}T{hora}:00Z"
+    end_time = f"{fecha}T{hora_fin}:00Z" if hora_fin else None
     payload = {
         "location_id": LOCATION_ID,
         "service_id": servicio_id,
-        "date": fecha,
-        "start_time": hora,
+        "start_time": start_time,
         "client": {"name": nombre, "phone": telefono, "email": email}
     }
     if provider_id:
         payload["provider_id"] = provider_id
-    if hora_fin:
-        payload["end_time"] = hora_fin
+    if end_time:
+        payload["end_time"] = end_time
     print(f"CREAR_CITA payload: {json.dumps(payload)}")
     async with httpx.AsyncClient() as client:
         r = await client.post(f"{AGENDAPRO_BASE}/bookings", headers=HEADERS, json=payload)
