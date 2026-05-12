@@ -25,7 +25,6 @@ async def consultar_servicios():
 async def consultar_disponibilidad(fecha: str, servicio_id: int):
     async with httpx.AsyncClient() as client:
         r = await client.get(f"{AGENDAPRO_BASE}/available_slots", headers=HEADERS, params={"location_id": LOCATION_ID, "service_id": servicio_id, "start_date": fecha})
-    print(f"DISPONIBILIDAD raw: {r.text[:2000]}")
     slots = r.json().get("data", {}).get("slots", [])
     if not slots:
         return {"mensaje": f"No hay horarios disponibles para el {fecha}."}
@@ -36,8 +35,7 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
                 "hora": s.get("start_time"),
                 "hora_fin": s.get("end_time"),
                 "provider_id": s.get("provider_id"),
-                "especialista": s.get("provider_name"),
-                "time_resource_id": s.get("time_resource_id")
+                "especialista": s.get("provider_name")
             }
             for s in slots
         ]
@@ -81,26 +79,22 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
 
         raise Exception(f"No se pudo obtener client_id. Respuesta: {r2.text}")
 
-async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str, provider_id: int = None, hora_fin: str = None, time_resource_id: int = None):
+async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str, provider_id: int = None, hora_fin: str = None):
+    # Obtener client_id
     client_id = await buscar_o_crear_cliente(nombre, telefono, email)
 
-    start_time = f"{fecha}T{hora}:00Z"
-    end_time = f"{fecha}T{hora_fin}:00Z" if hora_fin else None
-
+    # Formato correcto según soporte AgendaPro: usar "start" y "end", client_id en raíz
     payload = {
         "location_id": LOCATION_ID,
         "service_id": servicio_id,
-        "start_time": start_time,
-        "status_id": 1,
-        "client_id": client_id,
-        "client": {"name": nombre, "phone": telefono, "email": email}
+        "start": f"{fecha}T{hora}:00Z",
+        "end": f"{fecha}T{hora_fin}:00Z" if hora_fin else None,
+        "client_id": client_id,  # en la raíz, no anidado
+        "provider_id": provider_id
     }
-    if provider_id:
-        payload["provider_id"] = provider_id
-    if end_time:
-        payload["end_time"] = end_time
-    if time_resource_id:
-        payload["time_resource_id"] = time_resource_id
+
+    # Limpiar campos None
+    payload = {k: v for k, v in payload.items() if v is not None}
 
     print(f"CREAR_CITA payload: {json.dumps(payload)}")
     async with httpx.AsyncClient() as client:
@@ -128,8 +122,8 @@ async def cancelar_cita(id_cita: int):
 
 TOOLS = [
     {"name": "consultar_servicios", "description": "Devuelve servicios de Qi Beauty Bar con ID, nombre, precio y duración. Úsalo cuando el cliente pregunte qué servicios hay, precios o duración.", "inputSchema": {"type": "object", "properties": {}, "required": []}},
-    {"name": "consultar_disponibilidad", "description": "Consulta horarios disponibles para una fecha y servicio. Devuelve hora, hora_fin, provider_id, especialista y time_resource_id. SIEMPRE llama esta herramienta antes de crear una cita para obtener los valores exactos.", "inputSchema": {"type": "object", "properties": {"fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "servicio_id": {"type": "integer", "description": "ID del servicio obtenido de consultar_servicios"}}, "required": ["fecha", "servicio_id"]}},
-    {"name": "crear_cita", "description": "Crea una cita en AgendaPro. IMPORTANTE: Usa exactamente los valores de hora, hora_fin, provider_id y time_resource_id que devolvió consultar_disponibilidad sin modificarlos.", "inputSchema": {"type": "object", "properties": {"nombre": {"type": "string"}, "telefono": {"type": "string"}, "email": {"type": "string"}, "servicio_id": {"type": "integer"}, "fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "hora": {"type": "string", "description": "Hora exactamente como la devolvió consultar_disponibilidad"}, "hora_fin": {"type": "string", "description": "Hora fin exactamente como la devolvió consultar_disponibilidad"}, "provider_id": {"type": "integer", "description": "ID del especialista exactamente como lo devolvió consultar_disponibilidad"}, "time_resource_id": {"type": "integer", "description": "time_resource_id exactamente como lo devolvió consultar_disponibilidad, puede ser null"}}, "required": ["nombre", "telefono", "email", "servicio_id", "fecha", "hora", "hora_fin", "provider_id"]}},
+    {"name": "consultar_disponibilidad", "description": "Consulta horarios disponibles para una fecha y servicio. Devuelve hora, hora_fin, provider_id y especialista. SIEMPRE llama esta herramienta antes de crear una cita.", "inputSchema": {"type": "object", "properties": {"fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "servicio_id": {"type": "integer", "description": "ID del servicio obtenido de consultar_servicios"}}, "required": ["fecha", "servicio_id"]}},
+    {"name": "crear_cita", "description": "Crea una cita en AgendaPro. Usa exactamente los valores de hora, hora_fin y provider_id que devolvió consultar_disponibilidad sin modificarlos.", "inputSchema": {"type": "object", "properties": {"nombre": {"type": "string"}, "telefono": {"type": "string"}, "email": {"type": "string"}, "servicio_id": {"type": "integer"}, "fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "hora": {"type": "string", "description": "Hora exactamente como la devolvió consultar_disponibilidad"}, "hora_fin": {"type": "string", "description": "Hora fin exactamente como la devolvió consultar_disponibilidad"}, "provider_id": {"type": "integer", "description": "ID del especialista exactamente como lo devolvió consultar_disponibilidad"}}, "required": ["nombre", "telefono", "email", "servicio_id", "fecha", "hora", "hora_fin", "provider_id"]}},
     {"name": "cancelar_cita", "description": "Cancela una cita existente dado su ID numérico.", "inputSchema": {"type": "object", "properties": {"id_cita": {"type": "integer"}}, "required": ["id_cita"]}},
 ]
 
@@ -161,8 +155,7 @@ async def handle_mcp(request: Request):
                 result = await crear_cita(
                     args["nombre"], args["telefono"], args["email"],
                     args["servicio_id"], args["fecha"], args["hora"],
-                    args.get("provider_id"), args.get("hora_fin"),
-                    args.get("time_resource_id")
+                    args.get("provider_id"), args.get("hora_fin")
                 )
             elif tool_name == "cancelar_cita":
                 result = await cancelar_cita(args["id_cita"])
