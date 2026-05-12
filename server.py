@@ -9,15 +9,9 @@ from starlette.routing import Route
 
 AGENDAPRO_API_KEY = "apk_live_9e6a576c0be489891777985b4e029444"
 AGENDAPRO_BASE    = "https://connect.agendapro.com/v3"
-AGENDAPRO_V1_BASE = "https://agendapro.com/api/public/v1"
 LOCATION_ID       = 3856
 
 HEADERS = {
-    "Authorization": f"Bearer {AGENDAPRO_API_KEY}",
-    "Content-Type": "application/json",
-}
-
-HEADERS_V1 = {
     "Authorization": f"Bearer {AGENDAPRO_API_KEY}",
     "Content-Type": "application/json",
 }
@@ -48,12 +42,13 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
     }
 
 async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
-    """Busca el cliente por email. Si no existe, lo crea. Devuelve el client_id."""
+    """Busca cliente en v3 por email. Si no existe, lo crea. Devuelve client_id."""
     async with httpx.AsyncClient() as client:
-        # Intentar buscar por email
+
+        # 1. Buscar cliente por email en v3
         r = await client.get(
-            f"{AGENDAPRO_V1_BASE}/clients",
-            headers=HEADERS_V1,
+            f"{AGENDAPRO_BASE}/clients",
+            headers=HEADERS,
             params={"location_id": LOCATION_ID, "email": email}
         )
         print(f"BUSCAR_CLIENTE status: {r.status_code} response: {r.text}")
@@ -65,7 +60,7 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
                 print(f"CLIENTE ENCONTRADO id: {client_id}")
                 return client_id
 
-        # Si no existe, crear el cliente
+        # 2. Si no existe, crear cliente en v3
         partes = nombre.strip().split(" ", 1)
         first_name = partes[0]
         last_name = partes[1] if len(partes) > 1 else ""
@@ -79,8 +74,8 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
         }
         print(f"CREAR_CLIENTE payload: {json.dumps(nuevo_cliente)}")
         r2 = await client.post(
-            f"{AGENDAPRO_V1_BASE}/clients",
-            headers=HEADERS_V1,
+            f"{AGENDAPRO_BASE}/clients",
+            headers=HEADERS,
             json=nuevo_cliente
         )
         print(f"CREAR_CLIENTE status: {r2.status_code} response: {r2.text}")
@@ -96,7 +91,7 @@ async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, f
     # Paso 1: obtener client_id
     client_id = await buscar_o_crear_cliente(nombre, telefono, email)
 
-    # Paso 2: construir y enviar la reserva
+    # Paso 2: crear la reserva
     start_time = f"{fecha}T{hora}:00Z"
     end_time = f"{fecha}T{hora_fin}:00Z" if hora_fin else None
 
