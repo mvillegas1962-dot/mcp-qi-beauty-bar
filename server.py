@@ -48,6 +48,7 @@ async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, f
         "location_id": LOCATION_ID,
         "service_id": servicio_id,
         "start_time": start_time,
+        "status_id": 1,  # 1 = Confirmada
         "client": {"name": nombre, "phone": telefono, "email": email}
     }
     if provider_id:
