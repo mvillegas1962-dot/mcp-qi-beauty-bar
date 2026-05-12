@@ -44,8 +44,6 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
 async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
     """Busca cliente en v3 por email. Si no existe, lo crea. Devuelve client_id."""
     async with httpx.AsyncClient() as client:
-
-        # 1. Buscar cliente por email en v3
         r = await client.get(
             f"{AGENDAPRO_BASE}/clients",
             headers=HEADERS,
@@ -60,7 +58,6 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
                 print(f"CLIENTE ENCONTRADO id: {client_id}")
                 return client_id
 
-        # 2. Si no existe, crear cliente en v3
         partes = nombre.strip().split(" ", 1)
         first_name = partes[0]
         last_name = partes[1] if len(partes) > 1 else ""
@@ -91,7 +88,7 @@ async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, f
     # Paso 1: obtener client_id
     client_id = await buscar_o_crear_cliente(nombre, telefono, email)
 
-    # Paso 2: crear la reserva
+    # Paso 2: crear la reserva SIN provider_id para que AgendaPro lo asigne automáticamente
     start_time = f"{fecha}T{hora}:00Z"
     end_time = f"{fecha}T{hora_fin}:00Z" if hora_fin else None
 
@@ -103,8 +100,7 @@ async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, f
         "client_id": client_id,
         "client": {"name": nombre, "phone": telefono, "email": email}
     }
-    if provider_id:
-        payload["provider_id"] = provider_id
+    # NO enviamos provider_id — AgendaPro lo asigna automáticamente
     if end_time:
         payload["end_time"] = end_time
 
@@ -114,7 +110,16 @@ async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, f
     print(f"CREAR_CITA status: {r.status_code} response: {r.text}")
 
     if r.status_code in (200, 201):
-        return {"exito": True, "mensaje": f"Cita confirmada para {nombre} el {fecha} a las {hora}.", "id_cita": r.json().get("data", {}).get("id")}
+        data = r.json()
+        scheduled = data.get("scheduled", False)
+        provider_name = data.get("provider", {}).get("name", "") if isinstance(data.get("provider"), dict) else ""
+        return {
+            "exito": True,
+            "mensaje": f"Cita confirmada para {nombre} el {fecha} a las {hora}.",
+            "id_cita": data.get("id"),
+            "scheduled": scheduled,
+            "especialista": provider_name
+        }
     return {"exito": False, "detalle": r.text}
 
 async def cancelar_cita(id_cita: int):
@@ -127,7 +132,7 @@ async def cancelar_cita(id_cita: int):
 TOOLS = [
     {"name": "consultar_servicios", "description": "Devuelve servicios de Qi Beauty Bar con ID, nombre, precio y duración. Úsalo cuando el cliente pregunte qué servicios hay, precios o duración.", "inputSchema": {"type": "object", "properties": {}, "required": []}},
     {"name": "consultar_disponibilidad", "description": "Consulta horarios disponibles para una fecha y servicio. Devuelve hora, hora_fin, provider_id y especialista. Úsalo cuando el cliente quiera saber qué horas hay disponibles.", "inputSchema": {"type": "object", "properties": {"fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "servicio_id": {"type": "integer", "description": "ID del servicio obtenido de consultar_servicios"}}, "required": ["fecha", "servicio_id"]}},
-    {"name": "crear_cita", "description": "Crea una cita en AgendaPro. Úsalo cuando el cliente confirme que quiere agendar. Usa exactamente los valores de hora, hora_fin y provider_id que devolvió consultar_disponibilidad sin modificarlos.", "inputSchema": {"type": "object", "properties": {"nombre": {"type": "string"}, "telefono": {"type": "string"}, "email": {"type": "string"}, "servicio_id": {"type": "integer"}, "fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "hora": {"type": "string", "description": "Hora exactamente como la devolvió consultar_disponibilidad"}, "hora_fin": {"type": "string", "description": "Hora fin exactamente como la devolvió consultar_disponibilidad"}, "provider_id": {"type": "integer", "description": "ID del especialista exactamente como lo devolvió consultar_disponibilidad"}}, "required": ["nombre", "telefono", "email", "servicio_id", "fecha", "hora", "hora_fin", "provider_id"]}},
+    {"name": "crear_cita", "description": "Crea una cita en AgendaPro. Úsalo cuando el cliente confirme que quiere agendar. Usa exactamente los valores de hora y hora_fin que devolvió consultar_disponibilidad sin modificarlos. NO es necesario enviar provider_id.", "inputSchema": {"type": "object", "properties": {"nombre": {"type": "string"}, "telefono": {"type": "string"}, "email": {"type": "string"}, "servicio_id": {"type": "integer"}, "fecha": {"type": "string", "description": "Fecha en formato YYYY-MM-DD"}, "hora": {"type": "string", "description": "Hora exactamente como la devolvió consultar_disponibilidad"}, "hora_fin": {"type": "string", "description": "Hora fin exactamente como la devolvió consultar_disponibilidad"}}, "required": ["nombre", "telefono", "email", "servicio_id", "fecha", "hora", "hora_fin"]}},
     {"name": "cancelar_cita", "description": "Cancela una cita existente dado su ID numérico.", "inputSchema": {"type": "object", "properties": {"id_cita": {"type": "integer"}}, "required": ["id_cita"]}},
 ]
 
