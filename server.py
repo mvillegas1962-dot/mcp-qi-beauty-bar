@@ -68,7 +68,8 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
             "first_name": first_name,
             "last_name": last_name,
             "phone": telefono,
-            "email": email
+            "email": email,
+            "gender": "undefined"
         }
         print(f"CREAR_CLIENTE payload: {json.dumps(nuevo_cliente)}")
         r2 = await client.post(f"{AGENDAPRO_BASE}/clients", headers=HEADERS, json=nuevo_cliente)
