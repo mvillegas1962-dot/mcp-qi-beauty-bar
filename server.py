@@ -52,9 +52,11 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
 
         if r.status_code == 200:
             data = r.json().get("data", [])
-            if data and len(data) > 0:
-                client_id = data[0].get("id")
-                print(f"CLIENTE ENCONTRADO id: {client_id}")
+            # Filtrar por email exacto para evitar tomar el cliente equivocado
+            cliente_exacto = next((c for c in data if c.get("email", "").lower() == email.lower()), None)
+            if cliente_exacto:
+                client_id = cliente_exacto.get("id")
+                print(f"CLIENTE ENCONTRADO id: {client_id} email: {cliente_exacto.get('email')}")
                 return client_id
 
         partes = nombre.strip().split(" ", 1)
@@ -179,6 +181,7 @@ app = Starlette(routes=[Route("/mcp", handle_mcp, methods=["POST"])])
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 8080))
     uvicorn.run(app, host="0.0.0.0", port=port)
+
 
 
 
