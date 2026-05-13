@@ -43,12 +43,13 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
 
 async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
     async with httpx.AsyncClient() as client:
+        # Buscar con query= para que AgendaPro filtre por email
         r = await client.get(
             f"{AGENDAPRO_BASE}/clients",
             headers=HEADERS,
-            params={"location_id": LOCATION_ID, "email": email}
+            params={"location_id": LOCATION_ID, "query": email}
         )
-        print(f"BUSCAR_CLIENTE status: {r.status_code} response: {r.text}")
+        print(f"BUSCAR_CLIENTE status: {r.status_code}")
 
         if r.status_code == 200:
             data = r.json().get("data", [])
@@ -70,7 +71,7 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
             "last_name": last_name,
             "phone": telefono,
             "email": email,
-            "gender": "male"
+            "gender": "F"
         }
         print(f"CREAR_CLIENTE payload: {json.dumps(nuevo_cliente)}")
         r2 = await client.post(f"{AGENDAPRO_BASE}/clients", headers=HEADERS, json=nuevo_cliente)
