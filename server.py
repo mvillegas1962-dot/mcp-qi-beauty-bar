@@ -52,12 +52,13 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
 
         if r.status_code == 200:
             data = r.json().get("data", [])
-            # Filtrar por email exacto para evitar tomar el cliente equivocado
-            cliente_exacto = next((c for c in data if c.get("email", "").lower() == email.lower()), None)
+            print(f"BUSCAR_CLIENTE total: {len(data)} emails: {[c.get('email') for c in data]}")
+            cliente_exacto = next((c for c in data if c.get("email", "").lower().strip() == email.lower().strip()), None)
             if cliente_exacto:
                 client_id = cliente_exacto.get("id")
                 print(f"CLIENTE ENCONTRADO id: {client_id} email: {cliente_exacto.get('email')}")
                 return client_id
+            print(f"CLIENTE NO ENCONTRADO por email exacto: {email}, creando nuevo...")
 
         partes = nombre.strip().split(" ", 1)
         first_name = partes[0]
@@ -69,7 +70,7 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
             "last_name": last_name,
             "phone": telefono,
             "email": email,
-            "gender": "undefined"
+            "gender": "male"
         }
         print(f"CREAR_CLIENTE payload: {json.dumps(nuevo_cliente)}")
         r2 = await client.post(f"{AGENDAPRO_BASE}/clients", headers=HEADERS, json=nuevo_cliente)
