@@ -59,29 +59,32 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
                 client_id = cliente_exacto.get("id")
                 print(f"CLIENTE ENCONTRADO id: {client_id} email: {cliente_exacto.get('email')}")
                 return client_id
-            print(f"CLIENTE NO ENCONTRADO por email exacto: {email}, creando nuevo...")
+            print(f"CLIENTE NO ENCONTRADO por email exacto: {email}, intentando crear...")
 
         partes = nombre.strip().split(" ", 1)
         first_name = partes[0]
         last_name = partes[1] if len(partes) > 1 else ""
 
-        nuevo_cliente = {
-            "location_id": LOCATION_ID,
-            "first_name": first_name,
-            "last_name": last_name,
-            "phone": telefono,
-            "email": email,
-        }
-        print(f"CREAR_CLIENTE payload: {json.dumps(nuevo_cliente)}")
-        r2 = await client.post(f"{AGENDAPRO_BASE}/clients", headers=HEADERS, json=nuevo_cliente)
-        print(f"CREAR_CLIENTE status: {r2.status_code} response: {r2.text}")
+        # Probar diferentes valores de gender hasta encontrar el válido
+        for gender_val in ["female", "male", "woman", "man", "other", "0", "1", "2"]:
+            nuevo_cliente = {
+                "location_id": LOCATION_ID,
+                "first_name": first_name,
+                "last_name": last_name,
+                "phone": telefono,
+                "email": email,
+                "gender": gender_val
+            }
+            r2 = await client.post(f"{AGENDAPRO_BASE}/clients", headers=HEADERS, json=nuevo_cliente)
+            print(f"CREAR_CLIENTE gender={gender_val} status: {r2.status_code} response: {r2.text}")
+            if r2.status_code in (200, 201):
+                client_id = r2.json().get("data", {}).get("id")
+                print(f"CLIENTE CREADO id: {client_id} con gender={gender_val}")
+                return client_id
+            if "invalid_gender" not in r2.text:
+                break
 
-        if r2.status_code in (200, 201):
-            client_id = r2.json().get("data", {}).get("id")
-            print(f"CLIENTE CREADO id: {client_id}")
-            return client_id
-
-        raise Exception(f"No se pudo obtener client_id. Respuesta: {r2.text}")
+        raise Exception(f"No se pudo crear cliente. Ultimo response: {r2.text}")
 
 async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str, provider_id: int = None, hora_fin: str = None):
     # Obtener client_id
