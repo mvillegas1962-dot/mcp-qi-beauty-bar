@@ -99,7 +99,9 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
         print(f"CREAR_CLIENTE status: {r2.status_code} response: {r2.text}")
 
         if r2.status_code in (200, 201):
-            client_id = r2.json().get("data", {}).get("id")
+            resp_data = r2.json()
+            # La respuesta puede tener el id directo o dentro de "data"
+            client_id = resp_data.get("id") or resp_data.get("data", {}).get("id")
             print(f"CLIENTE CREADO id: {client_id}")
             return client_id
 
