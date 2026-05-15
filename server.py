@@ -99,10 +99,17 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
         raise Exception(f"No se pudo crear cliente. Ultimo response: {r2.text}")
 
 async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str, provider_id: int = None, hora_fin: str = None):
-    # Obtener client_id
-    client_id = await buscar_o_crear_cliente(nombre, telefono, email)
+    # Intentar encontrar client_id existente
+    try:
+        client_id = await buscar_o_crear_cliente(nombre, telefono, email)
+    except Exception as e:
+        print(f"ADVERTENCIA buscar cliente: {e}. Intentando con objeto client inline.")
+        client_id = None
 
-    # Formato correcto según soporte AgendaPro: usar "start" y "end", client_id en raíz
+    partes = nombre.strip().split(" ", 1)
+    first_name = partes[0]
+    last_name = partes[1] if len(partes) > 1 else ""
+
     payload = {
         "location_id": LOCATION_ID,
         "service_id": servicio_id,
@@ -111,9 +118,19 @@ async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, f
         "end": f"{fecha}T{hora_fin}:00Z" if hora_fin else None,
         "end_time": f"{fecha}T{hora_fin}:00Z" if hora_fin else None,
         "status_id": 1,
-        "client_id": client_id,  # en la raíz, no anidado
-        "provider_id": provider_id
+        "provider_id": provider_id,
+        # Siempre incluir objeto client inline (para clientes nuevos)
+        "client": {
+            "first_name": first_name,
+            "last_name": last_name,
+            "email": email,
+            "phone": telefono
+        }
     }
+
+    # Si encontramos client_id, también lo incluimos en raíz
+    if client_id:
+        payload["client_id"] = client_id
 
     # Limpiar campos None
     payload = {k: v for k, v in payload.items() if v is not None}
