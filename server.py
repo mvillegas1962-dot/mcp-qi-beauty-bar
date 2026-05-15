@@ -42,28 +42,36 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
     }
 
 async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
+    tel_limpio = telefono.replace(" ", "").replace("(", "").replace(")", "").replace("-", "").replace("+52", "")
     async with httpx.AsyncClient() as client:
-        # Intento 1: buscar por email
-        for query in [email, telefono]:
+        # Paginar hasta encontrar el cliente por email o teléfono exacto
+        page = 1
+        while page <= 10:  # máximo 10 páginas
             r = await client.get(
                 f"{AGENDAPRO_BASE}/clients",
                 headers=HEADERS,
-                params={"location_id": LOCATION_ID, "query": query}
+                params={"location_id": LOCATION_ID, "page": page, "per_page": 50}
             )
-            print(f"BUSCAR_CLIENTE query={query} status: {r.status_code}")
-            if r.status_code == 200:
-                data = r.json().get("data", [])
-                # Buscar por email exacto
-                cliente_exacto = next((c for c in data if c.get("email", "").lower().strip() == email.lower().strip()), None)
-                if not cliente_exacto:
-                    # Buscar por teléfono exacto (limpiar espacios y caracteres)
-                    tel_limpio = telefono.replace(" ", "").replace("(", "").replace(")", "").replace("-", "")
-                    cliente_exacto = next((c for c in data if c.get("phone", "").replace(" ", "").replace("+52", "").replace("-", "") == tel_limpio or tel_limpio in c.get("phone", "").replace(" ", "")), None)
-                if cliente_exacto:
-                    client_id = cliente_exacto.get("id")
-                    print(f"CLIENTE ENCONTRADO id: {client_id} nombre: {cliente_exacto.get('first_name')} email: {cliente_exacto.get('email')}")
-                    return client_id
-        print(f"CLIENTE NO ENCONTRADO, intentando crear...")
+            print(f"BUSCAR_CLIENTE page={page} status: {r.status_code}")
+            if r.status_code != 200:
+                break
+            data = r.json().get("data", [])
+            if not data:
+                break
+            # Buscar por email exacto
+            cliente_exacto = next((c for c in data if c.get("email", "").lower().strip() == email.lower().strip()), None)
+            if not cliente_exacto:
+                # Buscar por teléfono
+                cliente_exacto = next((c for c in data if tel_limpio in c.get("phone", "").replace(" ", "").replace("+52", "").replace("-", "")), None)
+            if cliente_exacto:
+                client_id = cliente_exacto.get("id")
+                print(f"CLIENTE ENCONTRADO page={page} id: {client_id} email: {cliente_exacto.get('email')}")
+                return client_id
+            # Si la página tiene menos de 50, ya terminamos
+            if len(data) < 50:
+                break
+            page += 1
+        print(f"CLIENTE NO ENCONTRADO en ninguna página, intentando crear...")
 
         partes = nombre.strip().split(" ", 1)
         first_name = partes[0]
