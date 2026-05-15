@@ -43,23 +43,27 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
 
 async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
     async with httpx.AsyncClient() as client:
-        # Buscar con query= para que AgendaPro filtre por email
-        r = await client.get(
-            f"{AGENDAPRO_BASE}/clients",
-            headers=HEADERS,
-            params={"location_id": LOCATION_ID, "query": email}
-        )
-        print(f"BUSCAR_CLIENTE status: {r.status_code}")
-
-        if r.status_code == 200:
-            data = r.json().get("data", [])
-            print(f"BUSCAR_CLIENTE total: {len(data)} emails: {[c.get('email') for c in data]}")
-            cliente_exacto = next((c for c in data if c.get("email", "").lower().strip() == email.lower().strip()), None)
-            if cliente_exacto:
-                client_id = cliente_exacto.get("id")
-                print(f"CLIENTE ENCONTRADO id: {client_id} email: {cliente_exacto.get('email')}")
-                return client_id
-            print(f"CLIENTE NO ENCONTRADO por email exacto: {email}, intentando crear...")
+        # Intento 1: buscar por email
+        for query in [email, telefono]:
+            r = await client.get(
+                f"{AGENDAPRO_BASE}/clients",
+                headers=HEADERS,
+                params={"location_id": LOCATION_ID, "query": query}
+            )
+            print(f"BUSCAR_CLIENTE query={query} status: {r.status_code}")
+            if r.status_code == 200:
+                data = r.json().get("data", [])
+                # Buscar por email exacto
+                cliente_exacto = next((c for c in data if c.get("email", "").lower().strip() == email.lower().strip()), None)
+                if not cliente_exacto:
+                    # Buscar por teléfono exacto (limpiar espacios y caracteres)
+                    tel_limpio = telefono.replace(" ", "").replace("(", "").replace(")", "").replace("-", "")
+                    cliente_exacto = next((c for c in data if c.get("phone", "").replace(" ", "").replace("+52", "").replace("-", "") == tel_limpio or tel_limpio in c.get("phone", "").replace(" ", "")), None)
+                if cliente_exacto:
+                    client_id = cliente_exacto.get("id")
+                    print(f"CLIENTE ENCONTRADO id: {client_id} nombre: {cliente_exacto.get('first_name')} email: {cliente_exacto.get('email')}")
+                    return client_id
+        print(f"CLIENTE NO ENCONTRADO, intentando crear...")
 
         partes = nombre.strip().split(" ", 1)
         first_name = partes[0]
