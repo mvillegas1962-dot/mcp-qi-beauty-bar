@@ -42,7 +42,15 @@ async def consultar_disponibilidad(fecha: str, servicio_id: int):
     }
 
 async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
-    tel_limpio = telefono.replace(" ", "").replace("(", "").replace(")", "").replace("-", "").replace("+52", "")
+    # Normalizar teléfono a formato E.164 (+52XXXXXXXXXX)
+    tel_limpio = telefono.replace(" ", "").replace("(", "").replace(")", "").replace("-", "").replace("+52", "").replace("+", "")
+    if len(tel_limpio) == 10:
+        tel_e164 = f"+52{tel_limpio}"
+    elif len(tel_limpio) == 12 and tel_limpio.startswith("52"):
+        tel_e164 = f"+{tel_limpio}"
+    else:
+        tel_e164 = f"+52{tel_limpio[-10:]}" if len(tel_limpio) >= 10 else telefono
+    print(f"TELEFONO E164: {tel_e164}")
     async with httpx.AsyncClient() as client:
         # Paginar hasta encontrar el cliente por email o teléfono exacto
         page = 1
@@ -77,26 +85,25 @@ async def buscar_o_crear_cliente(nombre: str, telefono: str, email: str) -> int:
         first_name = partes[0]
         last_name = partes[1] if len(partes) > 1 else ""
 
-        # Probar diferentes valores de gender hasta encontrar el válido
-        for gender_val in ["female", "male", "woman", "man", "other", "0", "1", "2"]:
-            nuevo_cliente = {
-                "location_id": LOCATION_ID,
-                "first_name": first_name,
-                "last_name": last_name,
-                "phone": telefono,
-                "email": email,
-                "gender": gender_val
-            }
-            r2 = await client.post(f"{AGENDAPRO_BASE}/clients", headers=HEADERS, json=nuevo_cliente)
-            print(f"CREAR_CLIENTE gender={gender_val} status: {r2.status_code} response: {r2.text}")
-            if r2.status_code in (200, 201):
-                client_id = r2.json().get("data", {}).get("id")
-                print(f"CLIENTE CREADO id: {client_id} con gender={gender_val}")
-                return client_id
-            if "invalid_gender" not in r2.text:
-                break
+        # gender: 0=other, 1=female, 2=male (integers según documentación AgendaPro)
+        nuevo_cliente = {
+            "location_id": LOCATION_ID,
+            "first_name": first_name,
+            "last_name": last_name,
+            "phone": tel_e164,
+            "email": email,
+            "gender": 1
+        }
+        print(f"CREAR_CLIENTE payload: {json.dumps(nuevo_cliente)}")
+        r2 = await client.post(f"{AGENDAPRO_BASE}/clients", headers=HEADERS, json=nuevo_cliente)
+        print(f"CREAR_CLIENTE status: {r2.status_code} response: {r2.text}")
 
-        raise Exception(f"No se pudo crear cliente. Ultimo response: {r2.text}")
+        if r2.status_code in (200, 201):
+            client_id = r2.json().get("data", {}).get("id")
+            print(f"CLIENTE CREADO id: {client_id}")
+            return client_id
+
+        raise Exception(f"No se pudo crear cliente. Respuesta: {r2.text}")
 
 async def crear_cita(nombre: str, telefono: str, email: str, servicio_id: int, fecha: str, hora: str, provider_id: int = None, hora_fin: str = None):
     # Intentar encontrar client_id existente
